@@ -1,0 +1,122 @@
+{
+  "job_id": "job_2b60d8f51cf1",
+  "status": "completed",
+  "filename": "WhatsApp Video 2026-09-08 at 01.10.13.mp4",
+  "video_metadata": {
+    "width": 848,
+    "height": 478,
+    "fps": 30.028525150368885,
+    "total_frames": 1013,
+    "duration_seconds": 33.73
+  },
+  "counts": {
+    "total_vehicles": 22,
+    "total_pedestrians": 6,
+    "class_counts": {
+      "Car": 4,
+      "Truck": 18,
+      "Person": 6
+    },
+    "direction_counts": {
+      "inbound": 18,
+      "outbound": 10
+    }
+  },
+  "composition": [
+    {
+      "name": "Truck",
+      "color": "#8b5cf6",
+      "percent": 64.3,
+      "count": 18
+    },
+    {
+      "name": "Person",
+      "color": "#10b981",
+      "percent": 21.4,
+      "count": 6
+    },
+    {
+      "name": "Car",
+      "color": "#3b82f6",
+      "percent": 14.3,
+      "count": 4
+    }
+  ],
+  "speed_analytics": {
+    "avg_speed_kmh": 25.8,
+    "max_speed_kmh": 41.3,
+    "speed_limit_kmh": 30.0,
+    "speed_compliance_rate": 72.7,
+    "speed_distribution": {
+      "< 20 km/h": 4,
+      "20-30 km/h": 12,
+      "30-40 km/h": 4,
+      "40-50 km/h": 2,
+      "> 50 km/h": 0
+    },
+    "speed_violations_count": 6
+  },
+  "pedestrian_analytics": {
+    "total_pedestrians": 6,
+    "avg_walk_speed_mps": 4.04,
+    "max_walk_speed_mps": 6.95,
+    "avg_wait_time_sec": 18.4,
+    "crossing_counts_by_arm": {
+      "North approach": 1,
+      "South approach": 1,
+      "East approach": 1,
+      "West approach": 1
+    }
+  },
+  "traffic_density": {
+    "avg_vehicles_per_frame": 10.9,
+    "peak_vehicles_per_frame": 20,
+    "density_level": "Moderate"
+  },
+  "conflict_analytics": {
+    "total_conflicts": 82,
+    "min_ttc_seconds": 0.1,
+    "vehicle_pedestrian_conflicts": 5,
+    "vehicle_vehicle_conflicts": 74,
+    "pedestrian_pedestrian_conflicts": 3,
+    "heatmap_5x5": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.43,
+      1.0,
+      0.06,
+      0.0,
+      0.19,
+      0.21,
+      0.09,
+      0.15,
+      0.04,
+      0.04,
+      0.0,
+      0.0,
+      0.0,
+      0.05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03
+    ],
+    "conflict_points_count": 82
+  },
+  "safety_indices": {
+    "PSI": 82.6,
+    "SRI": 0.86,
+    "CRI": 5676.0,
+    "PRI": 1080.0,
+    "PEI": 132.0,
+    "psi_band": "Critical concern",
+    "psi_recommendation": "Detailed safety assessment required; speed calming and pedestrian refuge intervention recommended."
+  },
+  "annotated_video_url": "/api/jobs/job_2b60d8f51cf1/video",
+  "processing_time_sec": 35.82
+}

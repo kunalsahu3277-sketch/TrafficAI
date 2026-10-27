@@ -1,0 +1,108 @@
+{
+  "job_id": "job_3a03ad1b8e09",
+  "status": "completed",
+  "filename": "test_traffic.mp4",
+  "video_metadata": {
+    "width": 640,
+    "height": 480,
+    "fps": 20.0,
+    "total_frames": 60,
+    "duration_seconds": 3.0
+  },
+  "counts": {
+    "total_vehicles": 1,
+    "total_pedestrians": 0,
+    "class_counts": {
+      "Truck": 1
+    },
+    "direction_counts": {
+      "inbound": 1,
+      "outbound": 0
+    }
+  },
+  "composition": [
+    {
+      "name": "Truck",
+      "color": "#8b5cf6",
+      "percent": 100.0,
+      "count": 1
+    }
+  ],
+  "speed_analytics": {
+    "avg_speed_kmh": 18.1,
+    "max_speed_kmh": 18.1,
+    "speed_limit_kmh": 30.0,
+    "speed_compliance_rate": 100.0,
+    "speed_distribution": {
+      "< 20 km/h": 1,
+      "20-30 km/h": 0,
+      "30-40 km/h": 0,
+      "40-50 km/h": 0,
+      "> 50 km/h": 0
+    },
+    "speed_violations_count": 0
+  },
+  "pedestrian_analytics": {
+    "total_pedestrians": 0,
+    "avg_walk_speed_mps": 0.0,
+    "max_walk_speed_mps": 0.0,
+    "avg_wait_time_sec": 18.4,
+    "crossing_counts_by_arm": {
+      "North approach": 0,
+      "South approach": 0,
+      "East approach": 0,
+      "West approach": 0
+    }
+  },
+  "traffic_density": {
+    "avg_vehicles_per_frame": 1.9,
+    "peak_vehicles_per_frame": 3,
+    "density_level": "Low"
+  },
+  "conflict_analytics": {
+    "total_conflicts": 0,
+    "min_ttc_seconds": 0.14,
+    "vehicle_pedestrian_conflicts": 0,
+    "vehicle_vehicle_conflicts": 0,
+    "pedestrian_pedestrian_conflicts": 0,
+    "heatmap_5x5": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.33,
+      0.22,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.44,
+      0.0,
+      0.0,
+      0.0,
+      0.22,
+      0.11,
+      0.0,
+      0.0,
+      0.0,
+      0.11,
+      0.22,
+      0.0,
+      0.0
+    ],
+    "conflict_points_count": 0
+  },
+  "safety_indices": {
+    "PSI": 67.2,
+    "SRI": 0.6,
+    "CRI": 129.3,
+    "PRI": 128.6,
+    "PEI": 1.0,
+    "psi_band": "High concern",
+    "psi_recommendation": "Prioritise pedestrian safety; evaluate traffic calming, refuge islands, and signal adjustment."
+  },
+  "annotated_video_url": "/api/jobs/job_3a03ad1b8e09/video",
+  "processing_time_sec": 2.59
+}

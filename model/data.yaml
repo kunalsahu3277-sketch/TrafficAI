@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['Bike', 'Car', 'Person', 'Truck']
+
+roboflow:
+  workspace: model-fpqlf
+  project: traffic-eac2y
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/model-fpqlf/traffic-eac2y/dataset/2
