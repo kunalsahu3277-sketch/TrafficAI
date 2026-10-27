@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Production build outputs
+dist/
+frontend/dist/
+
+# Python cache & env
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Temporary storage
+storage/jobs/*
+!storage/jobs/.gitkeep
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
