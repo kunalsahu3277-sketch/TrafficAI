@@ -1,6 +1,5 @@
 // API Service - Connects to FastAPI backend
-
-const API_BASE = '';  // Vite proxy handles routing to backend
+const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
 
 export async function checkHealth() {
   const start = performance.now();
