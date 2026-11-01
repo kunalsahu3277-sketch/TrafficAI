@@ -169,6 +169,8 @@ export default function YoloStudio() {
   const { ai, serverStatus } = state;
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const fileRef = useRef(null);  // always holds the current file — avoids stale closure in runInference
+  const kindRef = useRef('image');
   const [dragover, setDragover] = useState(false);
   const [showOverlayHeatmap, setShowOverlayHeatmap] = useState(false);
 
@@ -271,39 +273,58 @@ export default function YoloStudio() {
   }
 
   async function loadSampleImage() {
+    dispatch({ type: 'SET_AI', payload: { running: true, error: '', analyzed: false } });
     try {
       const file = await api.fetchSampleImage();
-      handleImageSelect(file);
-      setTimeout(() => runInference(), 400);
-    } catch {
-      dispatch({ type: 'SET_AI', payload: { error: 'Could not load sample image from server.' } });
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        dispatch({ type: 'SET_AI', payload: {
+          kind: 'image', file, fileUrl: url, sourceImg: img,
+          detections: [], analyzed: false, error: '', running: false
+        }});
+        // Kick off inference after state settles
+        runInferenceWithFile(file, 'image');
+      };
+      img.src = url;
+    } catch (err) {
+      dispatch({ type: 'SET_AI', payload: {
+        running: false,
+        error: `Could not load sample image — server may be waking up (Render cold start). Try again in 30s. (${err.message})`
+      }});
     }
   }
 
   async function loadSampleVideo() {
+    dispatch({ type: 'SET_AI', payload: { kind: 'video', running: true, error: '', analyzed: false, videoResult: null } });
     try {
-      dispatch({ type: 'SET_AI', payload: { kind: 'video' } });
       const file = await api.fetchSampleVideo();
-      handleVideoSelect(file);
-      setTimeout(() => runInference(), 400);
+      const url = URL.createObjectURL(file);
+      dispatch({ type: 'SET_AI', payload: {
+        file, fileUrl: url, annotatedVideoUrl: '', analyzed: false, error: '', running: false
+      }});
+      runInferenceWithFile(file, 'video');
     } catch (err) {
-      dispatch({ type: 'SET_AI', payload: { error: 'Could not load sample video: ' + err.message } });
+      dispatch({ type: 'SET_AI', payload: {
+        running: false,
+        error: `Could not load sample video — server may be waking up (Render cold start). Try again in 30s. (${err.message})`
+      }});
     }
   }
 
-  async function runInference() {
-    if (!ai.file || ai.running) return;
+  // Accepts the file directly — avoids stale closure on ai.file
+  async function runInferenceWithFile(file, kind) {
+    if (!file) return;
     dispatch({ type: 'SET_AI', payload: { running: true, error: '' } });
-    const conf = ai.confidence / 100;
+    const conf = (ai.confidence || 25) / 100;
     const startT = performance.now();
-
     try {
-      if (ai.kind === 'video') {
-        const data = await api.analyzeVideo(ai.file, conf);
+      if (kind === 'video') {
+        const data = await api.analyzeVideo(file, conf);
         dispatch({ type: 'SET_AI', payload: { videoResult: data, lastInferenceTime: Math.round(performance.now() - startT) } });
         if (data.job_id) await pollJob(data.job_id);
       } else {
-        const data = await api.predictImage(ai.file, conf);
+        const data = await api.predictImage(file, conf);
         dispatch({ type: 'SET_AI', payload: {
           detections: data.detections || [],
           analyzed: true,
@@ -316,7 +337,6 @@ export default function YoloStudio() {
       dispatch({ type: 'SET_AI', payload: { running: false } });
     }
   }
-
   function syncVideoResultsToEngine(results) {
     if (!results) return;
 
@@ -507,7 +527,7 @@ export default function YoloStudio() {
           </div>
 
           {/* Run Button */}
-          <button className="btn btn-primary" onClick={runInference} disabled={!ai.file || ai.running}>
+          <button className="btn btn-primary" onClick={() => runInferenceWithFile(ai.file, ai.kind)} disabled={!ai.file || ai.running}>
             {ai.running ? (
               <>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
