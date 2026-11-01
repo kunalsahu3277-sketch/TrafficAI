@@ -77,6 +77,8 @@ function appReducer(state, action) {
       return { ...state, params: { ...state.params, ...action.payload } };
     case 'SET_COMPOSITION':
       return { ...state, composition: action.payload };
+    case 'SET_HEATMAP':
+      return { ...state, heatmap: action.payload };
     case 'TOGGLE_OBSERVED':
       return { ...state, observed: { ...state.observed, [action.idx]: !state.observed[action.idx] } };
     default:

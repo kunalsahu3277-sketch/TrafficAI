@@ -157,21 +157,24 @@ class TrafficAnalyticsService:
         ped_wait_time: float = 18.0
     ) -> Dict[str, Any]:
         """
-        Evaluates official PSI, SRI, CRI, PRI, and PEI safety indices.
+        Evaluates official PSI, SRI, CRI, PRI, and PEI safety indices
+        strictly according to Section 3 provisional categories and index-specific rules.
         """
-        spd_avg = max(1.0, avg_speed_kmh)
-        spd_max = max(spd_avg, max_speed_kmh)
-        tv = max(1, traffic_volume)
-        pv = max(1, pedestrian_volume)
-        ttc = max(0.1, min_ttc)
+        spd_avg = max(1.0, float(avg_speed_kmh))
+        spd_max = max(spd_avg, float(max_speed_kmh))
+        tv = max(1, int(traffic_volume))
+        pv = max(1, int(pedestrian_volume))
+        ttc = max(0.1, float(min_ttc))
+        wt_ped = max(0.5, float(ped_wait_time))
 
+        # Normalized variables
         vsn = spd_max / spd_avg
         tvn = 1.25
         pvn = 1.20
         ttcn = 0.3
         wtn = 0.3
 
-        # Weights calibrated from project spec
+        # Weights calibrated from project specification
         w_ttc = 0.5028
         w_vs = 0.2562
         w_tv = 0.1394
@@ -182,22 +185,62 @@ class TrafficAnalyticsService:
         psi = round(min(100.0, max(0.0, raw_psi)), 1)
         sri = round(spd_avg / self.speed_limit, 2)
         cri = round((spd_avg * tv) / ttc, 1)
-        pri = round((pv * ped_wait_time) / ttc, 1)
+        pri = round((pv * wt_ped) / ttc, 1)
         pei = round(float(pv * tv), 1)
 
-        # Classification band
+        # 1. PSI Categories (Section 3)
         if psi > 80:
-            band = "Critical concern"
-            rec = "Detailed safety assessment required; speed calming and pedestrian refuge intervention recommended."
+            psi_band = "Critical concern"
+            psi_rec = "Detailed site assessment and applicable IRC warrant checks; stronger measures only where justified."
         elif psi > 60:
-            band = "High concern"
-            rec = "Prioritise pedestrian safety; evaluate traffic calming, refuge islands, and signal adjustment."
+            psi_band = "High concern"
+            psi_rec = "Prioritise pedestrian safety assessment; investigate speed, conflicts, refuge or controlled crossing options where justified."
         elif psi > 30:
-            band = "Moderate concern"
-            rec = "Inspect crossing visibility, sightlines, and vehicular approach speeds."
+            psi_band = "Moderate concern"
+            psi_rec = "Inspect crossing location, markings, signs, visibility, vehicle speeds and waiting conditions."
         else:
-            band = "Low concern"
-            rec = "Routine monitoring; maintain markings, signs, and unobstructed crossing pathways."
+            psi_band = "Low concern"
+            psi_rec = "Routine monitoring; maintain pedestrian facilities, signs, markings and unobstructed routes."
+
+        # 2. SRI Categories (Section 3)
+        if sri < 0.99:
+            sri_condition = "SRI < 1"
+            sri_meaning = "Speed in numerator is below the applicable limit."
+            sri_rec = "Maintain signs/markings; monitor speed distribution and visibility."
+        elif abs(sri - 1.0) <= 0.01:
+            sri_condition = "SRI = 1"
+            sri_meaning = "Speed in numerator equals the applicable limit."
+            sri_rec = "Check full speed distribution and intersection conditions."
+        else:
+            sri_condition = "SRI > 1"
+            sri_meaning = "Speed in numerator exceeds the applicable limit."
+            sri_rec = "Investigate speeding, sight distance and suitable speed management; assess traffic calming only if appropriate."
+
+        # 3. CRI, PRI, PEI Categories (Section 3)
+        # Numerical thresholds: CRI >= 4000, PRI >= 1500, PEI >= 100000
+        cri_is_high = cri >= 4000.0
+        cri_concern = "High / critical concern" if cri_is_high else "Lower / moderate concern"
+        cri_rec = (
+            "Prioritise conflict assessment; investigate speed, turning movements and crossing control; major treatments require site review."
+            if cri_is_high else
+            "Maintain traffic controls; review conflict points, turning movements and TTC observations."
+        )
+
+        pri_is_high = pri >= 1500.0
+        pri_concern = "High / critical concern" if pri_is_high else "Lower / moderate concern"
+        pri_rec = (
+            "Investigate unsafe crossing attempts, long waits, TTC and signal/crossing arrangements."
+            if pri_is_high else
+            "Monitor waiting time, crossing opportunities and pedestrian waiting areas."
+        )
+
+        pei_is_high = pei >= 100000.0
+        pei_concern = "High / critical concern" if pei_is_high else "Lower / moderate concern"
+        pei_rec = (
+            "Assess crossing demand, width, refuge and control using peak-hour flows and applicable criteria."
+            if pei_is_high else
+            "Maintain pedestrian routes; review crossing placement and demand."
+        )
 
         return {
             "PSI": psi,
@@ -205,8 +248,26 @@ class TrafficAnalyticsService:
             "CRI": cri,
             "PRI": pri,
             "PEI": pei,
-            "psi_band": band,
-            "psi_recommendation": rec
+            "psi_band": psi_band,
+            "psi_recommendation": psi_rec,
+            "sri_condition": sri_condition,
+            "sri_meaning": sri_meaning,
+            "sri_recommendation": sri_rec,
+            "cri_concern": cri_concern,
+            "cri_recommendation": cri_rec,
+            "pri_concern": pri_concern,
+            "pri_recommendation": pri_rec,
+            "pei_concern": pei_concern,
+            "pei_recommendation": pei_rec,
+            "parameters": {
+                "spd_avg": spd_avg,
+                "spd_max": spd_max,
+                "tv_avg": tv,
+                "pv_avg": pv,
+                "ttc": ttc,
+                "wt_ped": wt_ped,
+                "speed_limit": self.speed_limit
+            }
         }
 
     def format_composition(self, class_counts: Dict[str, int]) -> List[Dict[str, Any]]:

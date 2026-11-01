@@ -829,3 +829,27 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .g2 { grid-template-columns: 1fr; }
   main.content-area { padding: 20px 16px; }
 }
+
+/* Print Styles for Reports */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, aside.sidebar, .no-print, .page-header {
+    display: none !important;
+  }
+  .app-layout {
+    display: block !important;
+  }
+  main.content-area {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .report-document {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+}
+

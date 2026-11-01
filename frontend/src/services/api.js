@@ -1,13 +1,15 @@
-// API Service - Connects to FastAPI backend
-const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
+// API Service - Connects to FastAPI backend (Hosted on Render by default)
+const HOSTED_BACKEND_URL = 'https://trafficai-backends.onrender.com';
+const API_BASE = (import.meta.env.VITE_API_URL || HOSTED_BACKEND_URL).replace(/\/$/, '');
 
 export async function checkHealth() {
   const start = performance.now();
-  const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3500) });
+  // 15s timeout to allow for Render cloud server wakeup/cold-starts
+  const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const latency = Math.round(performance.now() - start);
-  return { ...data, latencyMs: latency };
+  return { ...data, latencyMs: latency, host: API_BASE };
 }
 
 export async function predictImage(file, conf = 0.25) {

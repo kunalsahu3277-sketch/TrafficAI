@@ -156,6 +156,48 @@ export default function YoloStudio() {
     }
   }
 
+  function syncVideoResultsToEngine(results) {
+    if (!results) return;
+
+    const counts = results.counts || {};
+    const spd = results.speed_analytics || {};
+    const conflicts = results.conflict_analytics || {};
+    const safety = results.safety_indices || {};
+    const safeParams = safety.parameters || {};
+
+    const tv = safeParams.tv_avg || Math.max(120, (counts.total_vehicles || 10) * 15);
+    const pv = safeParams.pv_avg || Math.max(30, (counts.total_pedestrians || 4) * 12);
+    const avgSpd = spd.avg_speed_kmh || safeParams.spd_avg || 32.0;
+    const maxSpd = spd.max_speed_kmh || safeParams.spd_max || Math.round(avgSpd * 1.3);
+    const ttc = conflicts.min_ttc_seconds || safeParams.ttc || 2.8;
+
+    dispatch({
+      type: 'SET_PARAMS',
+      payload: {
+        spdAvg: avgSpd,
+        spdMax: maxSpd,
+        limit: spd.speed_limit_kmh || state.params.limit,
+        tvAvg: tv,
+        tvMax: Math.round(tv * 1.25),
+        pvAvg: pv,
+        pvMax: Math.round(pv * 1.3),
+        ttc: ttc,
+        conflicts: conflicts.total_conflicts || 0,
+        vehCount: counts.total_vehicles || 0,
+        pedCount: counts.total_pedestrians || 0,
+        wtPed: safeParams.wt_ped || 18.4
+      }
+    });
+
+    if (results.composition && results.composition.length > 0) {
+      dispatch({ type: 'SET_COMPOSITION', payload: results.composition });
+    }
+
+    if (conflicts.heatmap_5x5 && conflicts.heatmap_5x5.length === 25) {
+      dispatch({ type: 'SET_HEATMAP', payload: conflicts.heatmap_5x5 });
+    }
+  }
+
   async function pollJob(jobId) {
     for (let i = 0; i < 150; i++) {
       await new Promise(r => setTimeout(r, 2000));
@@ -164,10 +206,16 @@ export default function YoloStudio() {
         dispatch({ type: 'SET_AI', payload: { videoResult: statusData } });
 
         if (statusData.status === 'completed') {
+          let finalResults = statusData.results;
           try {
-            const results = await api.getJobResults(jobId);
-            dispatch({ type: 'SET_AI', payload: { videoResult: results } });
+            finalResults = await api.getJobResults(jobId);
+            dispatch({ type: 'SET_AI', payload: { videoResult: finalResults } });
           } catch {}
+
+          if (finalResults) {
+            syncVideoResultsToEngine(finalResults);
+          }
+
           dispatch({ type: 'SET_AI', payload: {
             annotatedVideoUrl: api.getJobVideoUrl(jobId),
             videoViewMode: 'annotated',
@@ -216,13 +264,7 @@ export default function YoloStudio() {
         }});
       }
     } else if (ai.videoResult) {
-      const vr = ai.videoResult;
-      dispatch({ type: 'SET_PARAMS', payload: {
-        tvAvg: Math.round(vr.vehicle_detections || 350),
-        tvMax: Math.round((vr.vehicle_detections || 350) * 1.3),
-        pvAvg: Math.round(vr.pedestrian_detections || 180),
-        pvMax: Math.round((vr.pedestrian_detections || 180) * 1.25),
-      }});
+      syncVideoResultsToEngine(ai.videoResult);
     }
     alert('✨ AI detection metrics successfully synchronized with Traffic Safety calculations!');
   }
