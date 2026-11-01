@@ -8,7 +8,23 @@ from pathlib import Path
 from PIL import Image
 from typing import Optional, List, Dict, Any
 
-# Ensure lap is always available without triggering runtime pip install or C++ compilation
+# Prevent Ultralytics from running pip install / C++ compilation in restricted containers
+os.environ["ULTRALYTICS_SKIP_REQUIREMENTS_CHECKS"] = "1"
+os.environ["YOLO_AUTOINSTALL"] = "0"
+os.environ["ULTRALYTICS_AUTOINSTALL"] = "0"
+
+# Mock lap and importlib.metadata so ByteTrack operates smoothly on scipy without compilation
+try:
+    import importlib.metadata
+    _orig_version = importlib.metadata.version
+    def _safe_version(name):
+        if name in ("lap", "lapx"):
+            return "0.5.12"
+        return _orig_version(name)
+    importlib.metadata.version = _safe_version
+except Exception:
+    pass
+
 try:
     import lap
     assert hasattr(lap, "lapjv")
@@ -32,7 +48,7 @@ except Exception:
 
         mock_lap.lapjv = _lapjv
         sys.modules["lap"] = mock_lap
-    except Exception as e:
+    except Exception:
         pass
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response, status

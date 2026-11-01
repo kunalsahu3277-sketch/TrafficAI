@@ -1,5 +1,24 @@
+import os
 import sys
 import types
+
+# Prevent Ultralytics from running pip install / C++ compilation in restricted containers
+os.environ["ULTRALYTICS_SKIP_REQUIREMENTS_CHECKS"] = "1"
+os.environ["YOLO_AUTOINSTALL"] = "0"
+os.environ["ULTRALYTICS_AUTOINSTALL"] = "0"
+
+# Mock lap and importlib.metadata so ByteTrack operates smoothly on scipy without compilation
+try:
+    import importlib.metadata
+    _orig_version = importlib.metadata.version
+    def _safe_version(name):
+        if name in ("lap", "lapx"):
+            return "0.5.12"
+        return _orig_version(name)
+    importlib.metadata.version = _safe_version
+except Exception:
+    pass
+
 try:
     import lap
     assert hasattr(lap, "lapjv")
