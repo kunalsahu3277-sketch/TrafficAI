@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 from backend.config import settings
 
@@ -26,12 +26,15 @@ class TrafficAnalyticsService:
         self,
         trajectories: Dict[int, List[Tuple[int, int]]],
         track_classes: Dict[int, str],
-        fps: float = 30.0
+        fps: float = 30.0,
+        ttc_threshold: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Detect trajectory intersections and estimate Time-To-Collision (TTC)
         adapted from hybridacc.py and heatmapcross.py.
+        Supports custom user-defined or auto-calibrated TTC threshold.
         """
+        active_ttc_threshold = float(ttc_threshold) if ttc_threshold is not None and ttc_threshold > 0 else settings.TTC_CONFLICT_THRESHOLD_SEC
         conflict_points = []
         veh_ped_conflicts = 0
         veh_veh_conflicts = 0
@@ -79,7 +82,7 @@ class TrafficAnalyticsService:
                 if ttc < min_ttc and ttc > 0.1:
                     min_ttc = ttc
 
-                if is_crossing or (dist < 40 and ttc < settings.TTC_CONFLICT_THRESHOLD_SEC):
+                if is_crossing or (dist < 40 and ttc < active_ttc_threshold):
                     midpoint = ((p2[0] + p4[0]) // 2, (p2[1] + p4[1]) // 2)
                     conflict_points.append(midpoint)
 
@@ -99,6 +102,7 @@ class TrafficAnalyticsService:
         return {
             "total_conflicts": total_conflicts,
             "min_ttc_seconds": min_ttc,
+            "ttc_threshold_used": round(active_ttc_threshold, 2),
             "vehicle_pedestrian_conflicts": veh_ped_conflicts,
             "vehicle_vehicle_conflicts": veh_veh_conflicts,
             "pedestrian_pedestrian_conflicts": ped_ped_conflicts,

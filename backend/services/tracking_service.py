@@ -3,10 +3,100 @@ import logging
 from collections import defaultdict, deque
 from typing import Dict, List, Set, Tuple, Any, Optional
 import numpy as np
+import cv2
 
 from backend.config import settings
 
 logger = logging.getLogger("neural_traffic.tracking_service")
+
+
+def auto_detect_counting_line(video_path: str, sample_frames: int = 40) -> float:
+    """
+    Auto-detect the best counting line Y-position by analysing motion density
+    across sampled frames.
+
+    Strategy:
+      1. Read ~sample_frames evenly spaced frames.
+      2. Compute frame-difference (motion) image and accumulate a per-row sum.
+      3. Restrict search to the central 30-70% of frame height (avoids sky/ground edges).
+      4. Pick the row with peak accumulated motion → that is where vehicles are most active.
+      5. Return as a ratio 0-1 (line_y / frame_height).
+
+    Falls back to settings.LINE_POSITION_RATIO if anything goes wrong.
+    """
+    try:
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            return settings.LINE_POSITION_RATIO
+
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 1
+        step = max(1, total // sample_frames)
+
+        row_motion = np.zeros(h, dtype=np.float64)
+        prev_gray = None
+
+        for fi in range(0, min(total - 1, sample_frames * step), step):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, fi)
+            ret, frame = cap.read()
+            if not ret:
+                continue
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if prev_gray is not None and prev_gray.shape == gray.shape:
+                diff = cv2.absdiff(gray, prev_gray)
+                # Per-row sum of motion
+                row_motion += diff.sum(axis=1).astype(np.float64)
+            prev_gray = gray
+
+        cap.release()
+
+        if row_motion.max() == 0:
+            return settings.LINE_POSITION_RATIO
+
+        # Restrict to central 30-70% band
+        lo = int(h * 0.30)
+        hi = int(h * 0.70)
+        search = row_motion[lo:hi]
+        best_local = int(np.argmax(search))
+        best_row = lo + best_local
+
+        ratio = round(best_row / h, 3)
+        logger.info(f"[AutoLine] Detected counting line at row {best_row}/{h} → ratio {ratio}")
+        return ratio
+
+    except Exception as exc:
+        logger.warning(f"[AutoLine] Failed ({exc}); using default {settings.LINE_POSITION_RATIO}")
+        return settings.LINE_POSITION_RATIO
+
+
+def auto_calibrate_ttc_threshold(speed_samples: List[float]) -> float:
+    """
+    Auto-calibrate TTC conflict threshold based on observed vehicle speeds.
+
+    Logic (IRC / HCM-aligned):
+      - Slow traffic  (avg < 20 km/h)  → 3.5 s  (more time needed to react in dense urban)
+      - Normal traffic (20-40 km/h)    → 2.5 s  (default)
+      - Fast traffic  (> 40 km/h)      → 1.8 s  (higher speed → shorter reaction window)
+      - Very fast     (> 60 km/h)      → 1.2 s
+
+    Falls back to settings.TTC_CONFLICT_THRESHOLD_SEC if no speed data.
+    """
+    if not speed_samples:
+        return settings.TTC_CONFLICT_THRESHOLD_SEC
+
+    avg_speed = float(np.mean(speed_samples))
+
+    if avg_speed > 60:
+        threshold = 1.2
+    elif avg_speed > 40:
+        threshold = 1.8
+    elif avg_speed >= 20:
+        threshold = 2.5
+    else:
+        threshold = 3.5
+
+    logger.info(f"[AutoTTC] avg_speed={avg_speed:.1f} km/h → TTC threshold={threshold}s")
+    return threshold
 
 
 class CentroidTracker:
@@ -99,7 +189,8 @@ class TrafficTracker:
         self.speed_limit = speed_limit_kmh or settings.DEFAULT_SPEED_LIMIT_KMH
         
         # Counting line coordinates (default: 58% down the frame)
-        ratio = line_ratio or settings.LINE_POSITION_RATIO
+        ratio = float(line_ratio) if line_ratio is not None and 0.05 <= line_ratio <= 0.95 else settings.LINE_POSITION_RATIO
+        self.line_ratio = round(ratio, 3)
         self.line_y = int(self.h * ratio)
         self.line_start = (0, self.line_y)
         self.line_end = (self.w, self.line_y)
@@ -292,5 +383,6 @@ class TrafficTracker:
             "speed_compliance_rate": compliance,
             "avg_walk_speed_mps": avg_walk_speed,
             "max_walk_speed_mps": max_walk_speed,
-            "avg_time_headway_sec": avg_headway
+            "avg_time_headway_sec": avg_headway,
+            "line_ratio_used": self.line_ratio
         }

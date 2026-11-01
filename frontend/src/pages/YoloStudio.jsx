@@ -39,8 +39,14 @@ function VideoSafetyResults({ results }) {
           <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 16 }}>
             📊 YOLOv8 Video Analysis — Safety Formula Results
           </div>
-          <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>
-            All indices computed from real YOLO model detections · {counts.total_vehicles || 0} vehicles · {counts.total_pedestrians || 0} pedestrians tracked
+          <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>All indices computed from real YOLO model detections · {counts.total_vehicles || 0} vehicles · {counts.total_pedestrians || 0} pedestrians tracked</span>
+            <span style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5', padding: '1px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, border: '1px solid rgba(239,68,68,0.4)' }}>
+              📏 Line: {Math.round((results.calibration?.line_ratio || 0.58) * 100)}%
+            </span>
+            <span style={{ background: 'rgba(245,158,11,0.2)', color: '#fcd34d', padding: '1px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, border: '1px solid rgba(245,158,11,0.4)' }}>
+              ⏱️ TTC Threshold: {(results.calibration?.ttc_threshold || results.conflict_analytics?.ttc_threshold_used || 2.5).toFixed(1)}s
+            </span>
           </div>
         </div>
         <span className={`badge ${psiBadge}`} style={{ fontSize: 13, padding: '6px 14px' }}>{psiBand}</span>
@@ -173,6 +179,10 @@ export default function YoloStudio() {
   const kindRef = useRef('image');
   const [dragover, setDragover] = useState(false);
   const [showOverlayHeatmap, setShowOverlayHeatmap] = useState(false);
+  const [lineRatio, setLineRatio] = useState(58); // default 58% frame height
+  const [isAutoLine, setIsAutoLine] = useState(false);
+  const [ttcThreshold, setTtcThreshold] = useState(2.5); // default 2.5s
+  const [isAutoTtc, setIsAutoTtc] = useState(false);
 
   // Draw detections on canvas with optional spatial heatmap thermal overlay
   const renderCanvas = useCallback(() => {
@@ -320,7 +330,9 @@ export default function YoloStudio() {
     const startT = performance.now();
     try {
       if (kind === 'video') {
-        const data = await api.analyzeVideo(file, conf);
+        const sendLine = isAutoLine ? -1 : lineRatio / 100;
+        const sendTtc = isAutoTtc ? -1 : ttcThreshold;
+        const data = await api.analyzeVideo(file, conf, 0.45, sendLine, sendTtc);
         dispatch({ type: 'SET_AI', payload: { videoResult: data, lastInferenceTime: Math.round(performance.now() - startT) } });
         if (data.job_id) await pollJob(data.job_id);
       } else {
@@ -548,6 +560,128 @@ export default function YoloStudio() {
               onChange={e => dispatch({ type: 'SET_AI', payload: { confidence: Number(e.target.value) } })} />
           </div>
 
+          {/* Video Specific Adjustments: Counting Line & TTC */}
+          {ai.kind === 'video' && (
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              
+              {/* 1. Counting Line Customizer */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}></span>
+                    Counting Line (Y-Pos)
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: isAutoLine ? '#8b5cf6' : '#ef4444' }}>
+                    {isAutoLine ? '⚡ Auto-Detect' : `${lineRatio}% Frame`}
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="15"
+                  max="85"
+                  value={lineRatio}
+                  disabled={isAutoLine}
+                  onChange={e => setLineRatio(Number(e.target.value))}
+                  style={{ opacity: isAutoLine ? 0.45 : 1, width: '100%' }}
+                />
+
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoLine && lineRatio === 35 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoLine(false); setLineRatio(35); }}
+                  >Top (35%)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoLine && lineRatio === 50 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoLine(false); setLineRatio(50); }}
+                  >Center (50%)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoLine && lineRatio === 58 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoLine(false); setLineRatio(58); }}
+                  >Default (58%)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoLine && lineRatio === 70 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoLine(false); setLineRatio(70); }}
+                  >Bottom (70%)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${isAutoLine ? 'btn-indigo' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5, marginLeft: 'auto' }}
+                    onClick={() => setIsAutoLine(!isAutoLine)}
+                  >⚡ {isAutoLine ? 'Using Auto' : 'Auto-Detect'}</button>
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Vehicles & pedestrians crossing this line are counted & classified into inbound/outbound.
+                </div>
+              </div>
+
+              {/* 2. TTC Conflict Threshold Customizer */}
+              <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }}></span>
+                    TTC Conflict Threshold
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: isAutoTtc ? '#8b5cf6' : '#d97706' }}>
+                    {isAutoTtc ? '⚡ Auto-Calibrate' : `${ttcThreshold.toFixed(1)}s`}
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="0.5"
+                  max="5.0"
+                  step="0.1"
+                  value={ttcThreshold}
+                  disabled={isAutoTtc}
+                  onChange={e => setTtcThreshold(Number(e.target.value))}
+                  style={{ opacity: isAutoTtc ? 0.45 : 1, width: '100%' }}
+                />
+
+                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoTtc && ttcThreshold === 1.5 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoTtc(false); setTtcThreshold(1.5); }}
+                  >Near-miss (1.5s)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoTtc && ttcThreshold === 2.5 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoTtc(false); setTtcThreshold(2.5); }}
+                  >IRC Std (2.5s)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${!isAutoTtc && ttcThreshold === 3.5 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5 }}
+                    onClick={() => { setIsAutoTtc(false); setTtcThreshold(3.5); }}
+                  >Cautious (3.5s)</button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${isAutoTtc ? 'btn-indigo' : 'btn-secondary'}`}
+                    style={{ padding: '2px 7px', fontSize: 10.5, marginLeft: 'auto' }}
+                    onClick={() => setIsAutoTtc(!isAutoTtc)}
+                  >⚡ {isAutoTtc ? 'Using Auto' : 'Auto-Calibrate'}</button>
+                </div>
+                <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 4 }}>
+                  {ttcThreshold < 1.8 ? 'Strict: Flags only critical high-speed conflict near-misses.' :
+                   ttcThreshold > 3.0 ? 'Cautious: Flags early pedestrian and turning conflicts.' :
+                   'Standard: IRC standard urban conflict proximity window.'}
+                </div>
+              </div>
+
+            </div>
+          )}
+
           {/* Run Button */}
           <button className="btn btn-primary" onClick={() => runInferenceWithFile(ai.file, ai.kind)} disabled={!ai.file || ai.running}>
             {ai.running ? (
@@ -634,7 +768,39 @@ export default function YoloStudio() {
                       <button className="btn btn-sm btn-primary" onClick={() => dispatch({ type: 'SET_AI', payload: { videoViewMode: 'annotated' } })}>Switch to Annotated Stream</button>
                     </div>
                   )}
-                  <video src={ai.fileUrl} controls style={{ maxHeight: 480, width: '100%', borderRadius: 'var(--radius-md)' }} />
+                  <div style={{ position: 'relative', width: '100%', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <video src={ai.fileUrl} controls style={{ maxHeight: 480, width: '100%', display: 'block' }} />
+                    {/* Real-time Interactive Visual Overlay of Counting Line */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${isAutoLine ? 58 : lineRatio}%`,
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none',
+                        zIndex: 10
+                      }}
+                    >
+                      <div style={{ flex: 1, borderTop: '2.5px dashed #ef4444', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.85))' }}></div>
+                      <span style={{
+                        background: isAutoLine ? '#8b5cf6' : '#ef4444',
+                        color: '#ffffff',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        padding: '2px 9px',
+                        borderRadius: 4,
+                        letterSpacing: '0.04em',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.7)',
+                        margin: '0 8px'
+                      }}>
+                        🔴 COUNTING LINE {isAutoLine ? '(⚡ AUTO-DETECT)' : `(${lineRatio}%)`}
+                      </span>
+                      <div style={{ flex: 1, borderTop: '2.5px dashed #ef4444', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.85))' }}></div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: '#94a3b8', padding: 40 }}>

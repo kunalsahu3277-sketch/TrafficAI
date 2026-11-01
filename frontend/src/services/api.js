@@ -26,11 +26,13 @@ export async function predictImage(file, conf = 0.25) {
   return res.json();
 }
 
-export async function analyzeVideo(file, conf = 0.25, iou = 0.45) {
+export async function analyzeVideo(file, conf = 0.25, iou = 0.45, lineRatio = null, ttcThreshold = null) {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('conf', conf);
   formData.append('iou', iou);
+  if (lineRatio != null) formData.append('line_ratio', lineRatio);
+  if (ttcThreshold != null) formData.append('ttc_threshold', ttcThreshold);
   const res = await fetch(`${API_BASE}/api/video/analyze`, {
     method: 'POST',
     body: formData,

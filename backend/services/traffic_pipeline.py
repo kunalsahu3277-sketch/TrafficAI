@@ -57,7 +57,11 @@ import cv2
 
 from backend.config import settings
 from backend.services.model_registry import registry
-from backend.services.tracking_service import TrafficTracker
+from backend.services.tracking_service import (
+    TrafficTracker,
+    auto_detect_counting_line,
+    auto_calibrate_ttc_threshold
+)
 from backend.services.analytics_service import TrafficAnalyticsService
 from backend.services.video_service import video_service
 
@@ -93,17 +97,21 @@ class TrafficPipeline:
         job_id: str,
         video_path: Path,
         conf: float = 0.25,
-        iou: float = 0.45
+        iou: float = 0.45,
+        line_ratio: Optional[float] = None,
+        ttc_threshold: Optional[float] = None
     ):
         """Dispatches job processing to background worker."""
-        self.executor.submit(self._run_job_sync, job_id, video_path, conf, iou)
+        self.executor.submit(self._run_job_sync, job_id, video_path, conf, iou, line_ratio, ttc_threshold)
 
     def _run_job_sync(
         self,
         job_id: str,
         video_path: Path,
         conf: float,
-        iou: float
+        iou: float,
+        line_ratio: Optional[float] = None,
+        ttc_threshold: Optional[float] = None
     ):
         start_time = time.time()
         job = self.jobs.get(job_id)
@@ -131,11 +139,20 @@ class TrafficPipeline:
             job["total_frames"] = total_frames
             job["fps"] = fps
 
-            # 3. Setup tracker and analytics
+            # 3. Setup counting line (custom ratio or auto-detection)
+            if line_ratio is not None and (line_ratio == -1 or line_ratio <= 0):
+                effective_line_ratio = auto_detect_counting_line(str(video_path))
+            elif line_ratio is not None and 0.05 <= line_ratio <= 0.95:
+                effective_line_ratio = float(line_ratio)
+            else:
+                effective_line_ratio = settings.LINE_POSITION_RATIO
+
+            # Setup tracker and analytics
             tracker = TrafficTracker(
                 frame_width=w,
                 frame_height=h,
                 fps=fps,
+                line_ratio=effective_line_ratio,
                 speed_limit_kmh=settings.DEFAULT_SPEED_LIMIT_KMH
             )
             analytics = TrafficAnalyticsService(
@@ -235,10 +252,20 @@ class TrafficPipeline:
 
             # 6. Aggregate results
             summary = tracker.get_summary()
+
+            # Determine effective TTC conflict threshold (custom or auto-calibrated)
+            if ttc_threshold is not None and (ttc_threshold == -1 or ttc_threshold <= 0):
+                effective_ttc = auto_calibrate_ttc_threshold(tracker.all_vehicle_speeds)
+            elif ttc_threshold is not None and ttc_threshold > 0:
+                effective_ttc = float(ttc_threshold)
+            else:
+                effective_ttc = settings.TTC_CONFLICT_THRESHOLD_SEC
+
             conflicts = analytics.analyze_conflicts_and_ttc(
                 trajectories=tracker.trajectories,
                 track_classes=tracker.track_classes,
-                fps=fps
+                fps=fps,
+                ttc_threshold=effective_ttc
             )
 
             # Compute estimated hourly volumes from video sample duration
@@ -304,6 +331,11 @@ class TrafficPipeline:
                     "avg_vehicles_per_frame": round(sum(tracker.active_tracks_per_frame) / max(1, len(tracker.active_tracks_per_frame)), 1),
                     "peak_vehicles_per_frame": max(tracker.active_tracks_per_frame) if tracker.active_tracks_per_frame else 0,
                     "density_level": "Moderate" if summary["vehicle_count"] > 10 else "Low"
+                },
+                "calibration": {
+                    "line_ratio": effective_line_ratio,
+                    "line_y": tracker.line_y,
+                    "ttc_threshold": effective_ttc
                 },
                 "conflict_analytics": conflicts,
                 "safety_indices": safety,

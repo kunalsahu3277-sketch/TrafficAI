@@ -178,11 +178,14 @@ async def predict_image(
 async def analyze_video(
     file: UploadFile = File(...),
     conf: float = Form(0.25),
-    iou: float = Form(0.45)
+    iou: float = Form(0.45),
+    line_ratio: Optional[float] = Form(None),
+    ttc_threshold: Optional[float] = Form(None)
 ):
     """
     Accepts video upload, validates format and limits,
-    spawns background pipeline, and immediately returns a job ID.
+    spawns background pipeline with customizable counting line and TTC threshold,
+    and immediately returns a job ID.
     """
     job_id, job_dir = video_service.create_job()
     
@@ -192,8 +195,15 @@ async def analyze_video(
     # Register in pipeline
     job_info = pipeline.register_job(job_id, file.filename or "video.mp4")
 
-    # Launch background tracking & analysis
-    pipeline.submit_job(job_id, video_path, conf=conf, iou=iou)
+    # Launch background tracking & analysis with user-defined or auto calibration
+    pipeline.submit_job(
+        job_id,
+        video_path,
+        conf=conf,
+        iou=iou,
+        line_ratio=line_ratio,
+        ttc_threshold=ttc_threshold
+    )
 
     return {
         "job_id": job_id,
