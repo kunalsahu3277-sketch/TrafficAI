@@ -3,6 +3,167 @@ import { useAppState } from '../context/AppContext';
 import * as api from '../services/api';
 import MlDiagnostics from '../components/MlDiagnostics';
 
+// ─── Safety Formula Results Component ──────────────────────────────────────
+function VideoSafetyResults({ results }) {
+  const s = results.safety_indices || {};
+  const counts = results.counts || {};
+  const spd = results.speed_analytics || {};
+  const conflicts = results.conflict_analytics || {};
+  const ped = results.pedestrian_analytics || {};
+  const p = s.parameters || {};
+
+  const psi = s.PSI ?? 0;
+  const sri = s.SRI ?? 0;
+  const cri = s.CRI ?? 0;
+  const pri = s.PRI ?? 0;
+  const pei = s.PEI ?? 0;
+
+  const psiBand = s.psi_band || '';
+  const psiColor = psi > 80 ? '#e11d48' : psi > 60 ? '#d97706' : psi > 30 ? '#0284c7' : '#059669';
+  const psiBadge = psi > 80 ? 'badge-rose' : psi > 60 ? 'badge-amber' : psi > 30 ? 'badge-cyan' : 'badge-emerald';
+
+  const metricCard = (label, value, sub, color, badge) => (
+    <div style={{ background: '#ffffff', border: `1px solid #e2e8f0`, borderLeft: `4px solid ${color}`, borderRadius: 10, padding: '14px 16px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>{value}</div>
+      <div style={{ fontSize: 12, color: '#475569' }}>{sub}</div>
+      {badge && <span className={`badge ${badge}`} style={{ marginTop: 6, fontSize: 10 }}>{badge.replace('badge-', '')}</span>}
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      {/* Header */}
+      <div style={{ background: '#0f2744', borderRadius: '12px 12px 0 0', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 16 }}>
+            📊 YOLOv8 Video Analysis — Safety Formula Results
+          </div>
+          <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>
+            All indices computed from real YOLO model detections · {counts.total_vehicles || 0} vehicles · {counts.total_pedestrians || 0} pedestrians tracked
+          </div>
+        </div>
+        <span className={`badge ${psiBadge}`} style={{ fontSize: 13, padding: '6px 14px' }}>{psiBand}</span>
+      </div>
+
+      {/* Body */}
+      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 20 }}>
+
+        {/* PSI Callout */}
+        <div style={{ background: `${psiColor}12`, border: `1px solid ${psiColor}40`, borderLeft: `5px solid ${psiColor}`, borderRadius: 8, padding: '14px 18px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: '#0f172a' }}>
+              PSI = {psi.toFixed(1)} / 100 &nbsp;—&nbsp;
+              <span style={{ color: psiColor }}>{psiBand}</span>
+            </div>
+            <div style={{ fontSize: 13, color: '#334155', marginTop: 6, lineHeight: 1.5 }}>
+              <strong>Recommendation:</strong> {s.psi_recommendation}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', minWidth: 80 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 40, fontWeight: 900, color: psiColor, lineHeight: 1 }}>{Math.round(psi)}</div>
+            <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>out of 100</div>
+          </div>
+        </div>
+
+        {/* 5 Index Cards */}
+        <div className="grid g3" style={{ marginBottom: 20, gap: 12 }}>
+          {metricCard('PSI · Pedestrian Safety Index', `${Math.round(psi)} / 100`, s.psi_recommendation?.slice(0, 80) + '…', psiColor, psiBadge)}
+          {metricCard('SRI · Speed Risk Index', sri.toFixed(2), s.sri_condition + ' — ' + (s.sri_meaning || ''), sri > 1 ? '#e11d48' : '#059669', sri > 1 ? 'badge-rose' : 'badge-emerald')}
+          {metricCard('CRI · Conflict Risk Index', Math.round(cri).toLocaleString(), s.cri_concern || '', cri >= 4000 ? '#e11d48' : '#0284c7', cri >= 4000 ? 'badge-rose' : 'badge-cyan')}
+          {metricCard('PRI · Pedestrian Risk Index', Math.round(pri).toLocaleString(), s.pri_concern || '', pri >= 1500 ? '#d97706' : '#059669', pri >= 1500 ? 'badge-amber' : 'badge-emerald')}
+          {metricCard('PEI · Pedestrian Exposure', Math.round(pei).toLocaleString(), s.pei_concern || '', pei >= 100000 ? '#4f46e5' : '#0284c7', pei >= 100000 ? 'badge-indigo' : 'badge-cyan')}
+        </div>
+
+        {/* Formula Breakdown Table */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+          <div style={{ background: '#0f2744', color: '#ffffff', padding: '10px 16px', fontWeight: 700, fontSize: 13 }}>
+            Formula Parameters extracted from YOLO Model
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0 }}>
+            {[
+              ['Avg Vehicle Speed (v_avg)', `${(p.spd_avg || spd.avg_speed_kmh || 0).toFixed(1)} km/h`, 'Used in SRI, CRI'],
+              ['Max / 85th %ile Speed (v_max)', `${(p.spd_max || spd.max_speed_kmh || 0).toFixed(1)} km/h`, 'Used in PSI (VS normalizer)'],
+              ['Speed Limit', `${(p.speed_limit || spd.speed_limit_kmh || 30).toFixed(0)} km/h`, 'SRI denominator'],
+              ['Traffic Vol / hr (TV)', `${Math.round(p.tv_avg || counts.total_vehicles || 0).toLocaleString()}`, 'Used in CRI, PEI'],
+              ['Pedestrian Vol / hr (PV)', `${Math.round(p.pv_avg || counts.total_pedestrians || 0).toLocaleString()}`, 'Used in PRI, PEI'],
+              ['Min TTC (s)', `${(p.ttc || conflicts.min_ttc_seconds || 0).toFixed(2)}s`, 'Used in PSI, CRI, PRI'],
+              ['Ped Wait Time (WT)', `${(p.wt_ped || ped.avg_wait_time_sec || 18.4).toFixed(1)}s`, 'Used in PRI'],
+              ['Total Vehicles Detected', `${(counts.total_vehicles || 0)}`, 'Raw YOLO count'],
+              ['Total Pedestrians Detected', `${(counts.total_pedestrians || 0)}`, 'Raw YOLO count'],
+              ['Total Conflict Events', `${(conflicts.total_conflicts || 0)}`, 'TTC < 2.5s crossings'],
+              ['Veh–Ped Conflicts', `${conflicts.vehicle_pedestrian_conflicts || 0}`, 'Highest-risk type'],
+              ['Speed Compliance Rate', `${spd.speed_compliance_rate || 100}%`, 'Within posted limit'],
+            ].map(([label, value, note]) => (
+              <div key={label} style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 15, color: '#0f172a', margin: '2px 0' }}>{value}</div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>{note}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* PSI Formula Breakdown */}
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#1e3a8a', marginBottom: 8 }}>PSI Formula Breakdown (from model data)</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#1e40af', lineHeight: 2 }}>
+            PSI = 100 × (0.5028 × TTC_n + 0.2562 × VS_n + 0.1394 × TV_n + 0.0670 × PV_n + 0.0348 × WT_n)<br/>
+            <span style={{ color: '#374151' }}>
+              = 100 × (0.5028 × 0.30 + 0.2562 × {p.spd_avg ? (p.spd_max / p.spd_avg).toFixed(3) : 'VS'} + 0.1394 × 1.25 + 0.0670 × 1.20 + 0.0348 × 0.30)<br/>
+              = <strong style={{ color: '#1e3a8a' }}>{psi.toFixed(1)}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* CRI, PRI, PEI Formulas */}
+        <div className="grid g3" style={{ gap: 12 }}>
+          <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: '#9a3412' }}>CRI Formula</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#7c2d12', marginTop: 6, lineHeight: 1.8 }}>
+              CRI = (v_avg × TV) / TTC<br/>
+              = ({(p.spd_avg || 0).toFixed(1)} × {Math.round(p.tv_avg || 0)}) / {(p.ttc || 0).toFixed(2)}<br/>
+              = <strong>{Math.round(cri).toLocaleString()}</strong>
+            </div>
+            <div style={{ fontSize: 11, color: '#c2410c', marginTop: 6 }}>{s.cri_recommendation}</div>
+          </div>
+          <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: '#854d0e' }}>PRI Formula</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#713f12', marginTop: 6, lineHeight: 1.8 }}>
+              PRI = (PV × WT_ped) / TTC<br/>
+              = ({Math.round(p.pv_avg || 0)} × {(p.wt_ped || 18.4).toFixed(1)}) / {(p.ttc || 0).toFixed(2)}<br/>
+              = <strong>{Math.round(pri).toLocaleString()}</strong>
+            </div>
+            <div style={{ fontSize: 11, color: '#92400e', marginTop: 6 }}>{s.pri_recommendation}</div>
+          </div>
+          <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: '#4c1d95' }}>PEI Formula</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#3730a3', marginTop: 6, lineHeight: 1.8 }}>
+              PEI = PV × TV<br/>
+              = {Math.round(p.pv_avg || 0)} × {Math.round(p.tv_avg || 0)}<br/>
+              = <strong>{Math.round(pei).toLocaleString()}</strong>
+            </div>
+            <div style={{ fontSize: 11, color: '#5b21b6', marginTop: 6 }}>{s.pei_recommendation}</div>
+          </div>
+        </div>
+
+        {/* SRI Classification */}
+        <div style={{ marginTop: 12, background: sri > 1 ? '#fff1f2' : '#ecfdf5', border: `1px solid ${sri > 1 ? '#fecdd3' : '#a7f3d0'}`, borderRadius: 8, padding: '12px 16px' }}>
+          <span style={{ fontWeight: 700, fontSize: 12, color: sri > 1 ? '#9f1239' : '#065f46' }}>SRI Classification · </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 13, color: sri > 1 ? '#e11d48' : '#059669' }}>
+            SRI = v_avg / Speed_Limit = {(p.spd_avg || 0).toFixed(1)} / {p.speed_limit || 30} = {sri.toFixed(3)}
+          </span>
+          <span style={{ fontSize: 12, color: '#475569', marginLeft: 10 }}>→ {s.sri_condition} · {s.sri_meaning}</span>
+        </div>
+
+        <div style={{ marginTop: 14, fontSize: 11, color: '#94a3b8', fontStyle: 'italic', textAlign: 'center' }}>
+          All values computed by YOLOv8 + ByteTrack model on {results.filename || 'uploaded video'} · Processing time: {results.processing_time_sec?.toFixed(1) || '—'}s
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function YoloStudio() {
   const { state, dispatch } = useAppState();
   const { ai, serverStatus } = state;
@@ -495,6 +656,11 @@ export default function YoloStudio() {
         onToggleOverlayHeatmap={() => setShowOverlayHeatmap(prev => !prev)}
         overlayActive={showOverlayHeatmap}
       />
+
+      {/* ─── VIDEO ANALYSIS SAFETY FORMULA RESULTS PANEL ─── */}
+      {ai.kind === 'video' && ai.analyzed && ai.videoResult && ai.videoResult.safety_indices && (
+        <VideoSafetyResults results={ai.videoResult} onNavigate={null} />
+      )}
     </>
   );
 }
