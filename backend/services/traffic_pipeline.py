@@ -97,29 +97,39 @@ class TrafficPipeline:
                 speed_limit_kmh=settings.DEFAULT_SPEED_LIMIT_KMH
             )
 
-            # 4. Determine frame-skip rate to target ~8 inference fps regardless of source fps
-            #    e.g. 30fps source → skip every 3rd frame; 60fps → skip 7; keeps accuracy high
+            # 4. Determine frame-skip rate targeting ~60-100 total inferences on Render free tier
             INFERENCE_TARGET_FPS = 8
-            frame_skip = max(1, round(fps / INFERENCE_TARGET_FPS))
+            base_skip = max(1, round(fps / INFERENCE_TARGET_FPS))
+            target_evals = 80
+            frame_skip = max(base_skip, max(1, total_frames // target_evals))
 
             # Resize frames to max 640px wide before inference (YOLO native input size)
             MAX_INFER_WIDTH = 640
             infer_w = min(w, MAX_INFER_WIDTH)
             infer_h = int(h * (infer_w / w))
 
-            # Setup output writer only if resolution is reasonable (skip for very large vids)
-            WRITE_ANNOTATED = w <= 1920
-            writer = video_service.get_video_writer(output_video_path, w, h, fps) if WRITE_ANNOTATED else None
+            # Target output resolution for web video to save memory (<50MB RAM vs 400MB)
+            MAX_OUT_WIDTH = 854
+            out_w = min(w, MAX_OUT_WIDTH)
+            out_h = int(h * (out_w / w))
+            out_w -= (out_w % 2)
+            out_h -= (out_h % 2)
+
+            writer = video_service.get_video_writer(output_video_path, out_w, out_h, fps)
 
             # 5. Process video frames
             cap = cv2.VideoCapture(str(video_path))
             frame_idx = 0
             last_results = None
             last_frame_analytics = {"detections": []}
+            MAX_PROCESS_FRAMES = 900  # Cap at ~30s of video to guarantee stable low RAM on Render
 
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
+                    break
+
+                if frame_idx >= MAX_PROCESS_FRAMES:
                     break
 
                 if frame_idx % frame_skip == 0:
@@ -142,8 +152,8 @@ class TrafficPipeline:
 
                     last_frame_analytics = tracker.process_frame(frame_idx, last_results, scale_x=sx, scale_y=sy)
 
-                # Write annotated frame (reuse last detections for skipped frames)
-                if WRITE_ANNOTATED and writer is not None:
+                # Write annotated frame (scaled to out_w, out_h)
+                if writer is not None:
                     annotated = video_service.annotate_frame(
                         frame=frame,
                         detections=last_frame_analytics["detections"],
@@ -153,17 +163,24 @@ class TrafficPipeline:
                         avg_speed=tracker.get_summary()["avg_speed_kmh"],
                         fps=fps
                     )
+                    if annotated.shape[1] != out_w or annotated.shape[0] != out_h:
+                        annotated = cv2.resize(annotated, (out_w, out_h))
                     writer.write(annotated)
+
+                # Yield CPU briefly every 2 frames so FastAPI can handle polling/health pings
+                if frame_idx % 2 == 0:
+                    time.sleep(0.005)
 
                 frame_idx += 1
                 job["current_frame"] = frame_idx
-                job["progress"] = round((frame_idx / total_frames) * 100, 1)
+                effective_total = min(total_frames, MAX_PROCESS_FRAMES)
+                job["progress"] = min(99.0, round((frame_idx / max(1, effective_total)) * 100, 1))
 
                 elapsed = time.time() - start_time
                 job["elapsed_seconds"] = round(elapsed, 1)
                 if frame_idx > 5 and elapsed > 0:
                     fps_proc = frame_idx / elapsed
-                    remaining_frames = max(0, total_frames - frame_idx)
+                    remaining_frames = max(0, effective_total - frame_idx)
                     job["eta_seconds"] = round(remaining_frames / max(0.1, fps_proc), 1)
 
             cap.release()
@@ -180,7 +197,7 @@ class TrafficPipeline:
             )
 
             # Compute estimated hourly volumes from video sample duration
-            duration_sec = max(1.0, float(total_frames) / max(1.0, float(fps)))
+            duration_sec = max(1.0, float(frame_idx) / max(1.0, float(fps)))
             hourly_scale = 3600.0 / duration_sec
             tv_hourly = max(120, int(summary["vehicle_count"] * hourly_scale))
             pv_hourly = max(30, int(summary["pedestrian_count"] * hourly_scale))

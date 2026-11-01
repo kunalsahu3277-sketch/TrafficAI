@@ -4,8 +4,8 @@ export const API_BASE = (import.meta.env.VITE_API_URL || HOSTED_BACKEND_URL).rep
 
 export async function checkHealth() {
   const start = performance.now();
-  // 40s timeout: Render free tier cold-starts can take 20-30 s
-  const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(40000) });
+  // 60s timeout: Render free tier cold-starts can take 30-50 s
+  const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(60000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return { ...data, latencyMs: Math.round(performance.now() - start), host: API_BASE };
@@ -45,7 +45,7 @@ export async function analyzeVideo(file, conf = 0.25, iou = 0.45) {
 
 export async function getJobStatus(jobId) {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
-    signal: AbortSignal.timeout(15000)
+    signal: AbortSignal.timeout(30000)
   });
   if (!res.ok) throw new Error('Failed to get job status');
   return res.json();
@@ -53,7 +53,7 @@ export async function getJobStatus(jobId) {
 
 export async function getJobResults(jobId) {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}/results`, {
-    signal: AbortSignal.timeout(15000)
+    signal: AbortSignal.timeout(30000)
   });
   if (!res.ok) throw new Error('Results not available');
   return res.json();

@@ -380,10 +380,15 @@ export default function YoloStudio() {
   }
 
   async function pollJob(jobId) {
-    for (let i = 0; i < 150; i++) {
-      await new Promise(r => setTimeout(r, 2000));
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 8; // allow transient failed requests while server computes
+    const maxPollAttempts = 180; // up to ~7.5 minutes
+
+    for (let i = 0; i < maxPollAttempts; i++) {
+      await new Promise(r => setTimeout(r, 2500));
       try {
         const statusData = await api.getJobStatus(jobId);
+        consecutiveErrors = 0; // reset counter on successful response
         dispatch({ type: 'SET_AI', payload: { videoResult: statusData } });
 
         if (statusData.status === 'completed') {
@@ -400,17 +405,34 @@ export default function YoloStudio() {
           dispatch({ type: 'SET_AI', payload: {
             annotatedVideoUrl: api.getJobVideoUrl(jobId),
             videoViewMode: 'annotated',
-            analyzed: true
+            analyzed: true,
+            running: false,
+            error: ''
           }});
           return;
         } else if (statusData.status === 'failed') {
-          throw new Error(statusData.error_message || 'Video processing failed.');
+          throw new Error(statusData.error_message || 'Video processing failed on server.');
         }
       } catch (err) {
-        dispatch({ type: 'SET_AI', payload: { error: err.message } });
-        return;
+        if (err.message && err.message.includes('Video processing failed')) {
+          dispatch({ type: 'SET_AI', payload: { error: err.message, running: false } });
+          return;
+        }
+        consecutiveErrors++;
+        console.warn(`Polling attempt ${i + 1} hiccup (${consecutiveErrors}/${maxConsecutiveErrors}):`, err.message);
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          dispatch({
+            type: 'SET_AI',
+            payload: {
+              error: `Video processing lost connection to server. Render free tier may be rebooting or out of memory. Try a shorter video clip or 1-Click Sample.`,
+              running: false
+            }
+          });
+          return;
+        }
       }
     }
+    dispatch({ type: 'SET_AI', payload: { error: 'Video analysis timed out after 7 minutes.', running: false } });
   }
 
   function applyToCalculations() {

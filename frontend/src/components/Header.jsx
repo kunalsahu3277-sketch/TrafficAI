@@ -1,7 +1,7 @@
 import { useAppState } from '../context/AppContext';
 
 export default function Header({ onNavigate, onPing }) {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const { serverStatus, serverLatency } = state;
 
   const dotClass = serverStatus === 'online' ? 'online' : serverStatus === 'offline' ? 'offline' : 'checking';
@@ -10,6 +10,11 @@ export default function Header({ onNavigate, onPing }) {
     : serverStatus === 'offline'
       ? 'YOLO Backend Offline (Click to connect)'
       : 'Connecting to YOLO Backend...';
+
+  const handlePing = () => {
+    dispatch({ type: 'SET_SERVER_STATUS', payload: { status: 'checking', latency: null } });
+    if (onPing) onPing();
+  };
 
   return (
     <header>
@@ -26,7 +31,7 @@ export default function Header({ onNavigate, onPing }) {
       </div>
 
       <div className="header-actions">
-        <div className="server-status-pill" onClick={onPing} title="Click to test connection">
+        <div className="server-status-pill" onClick={handlePing} title="Click to test connection">
           <div className={`status-dot ${dotClass}`}></div>
           <span>{statusText}</span>
         </div>

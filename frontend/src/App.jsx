@@ -19,7 +19,6 @@ function AppContent() {
 
   const pingServer = useCallback(async () => {
     try {
-      const t0 = performance.now();
       setWaking(true);
       const data = await checkHealth();
       setWaking(false);
@@ -35,9 +34,11 @@ function AppContent() {
 
   useEffect(() => {
     pingServer();
-    const interval = setInterval(pingServer, 30000);
-    return () => clearInterval(interval);
-  }, [pingServer]);
+    // Re-check frequently (8s) if offline so recovery is fast; every 30s when stable
+    const delay = state.serverStatus === 'online' ? 30000 : 8000;
+    const timer = setTimeout(pingServer, delay);
+    return () => clearTimeout(timer);
+  }, [pingServer, state.serverStatus]);
 
   const navigateTo = useCallback((tab) => {
     setCurrentTab(tab);
