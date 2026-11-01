@@ -1,0 +1,126 @@
+{
+  "job_id": "test_local4",
+  "status": "completed",
+  "filename": "test_traffic.mp4",
+  "video_metadata": {
+    "width": 640,
+    "height": 480,
+    "fps": 20.0,
+    "total_frames": 60,
+    "duration_seconds": 3.0
+  },
+  "counts": {
+    "total_vehicles": 1,
+    "total_pedestrians": 0,
+    "class_counts": {
+      "Truck": 1
+    },
+    "direction_counts": {
+      "inbound": 1,
+      "outbound": 0
+    }
+  },
+  "composition": [
+    {
+      "name": "Truck",
+      "color": "#8b5cf6",
+      "percent": 100.0,
+      "count": 1
+    }
+  ],
+  "speed_analytics": {
+    "avg_speed_kmh": 43.9,
+    "max_speed_kmh": 70.2,
+    "speed_limit_kmh": 30.0,
+    "speed_compliance_rate": 50.0,
+    "speed_distribution": {
+      "< 20 km/h": 1,
+      "20-30 km/h": 0,
+      "30-40 km/h": 0,
+      "40-50 km/h": 0,
+      "> 50 km/h": 1
+    },
+    "speed_violations_count": 1
+  },
+  "pedestrian_analytics": {
+    "total_pedestrians": 0,
+    "avg_walk_speed_mps": 1.2,
+    "max_walk_speed_mps": 1.8,
+    "avg_wait_time_sec": 18.4,
+    "crossing_counts_by_arm": {
+      "North approach": 0,
+      "South approach": 0,
+      "East approach": 0,
+      "West approach": 0
+    }
+  },
+  "traffic_density": {
+    "avg_vehicles_per_frame": 1.7,
+    "peak_vehicles_per_frame": 3,
+    "density_level": "Low"
+  },
+  "conflict_analytics": {
+    "total_conflicts": 0,
+    "min_ttc_seconds": 0.56,
+    "vehicle_pedestrian_conflicts": 0,
+    "vehicle_vehicle_conflicts": 0,
+    "pedestrian_pedestrian_conflicts": 0,
+    "heatmap_5x5": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.2,
+      0.2,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.4,
+      0.0,
+      0.0,
+      0.0,
+      0.2,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.2,
+      0.0,
+      0.0
+    ],
+    "conflict_points_count": 0
+  },
+  "safety_indices": {
+    "PSI": 82.6,
+    "SRI": 1.46,
+    "CRI": 94071.4,
+    "PRI": 985.7,
+    "PEI": 36000.0,
+    "psi_band": "Critical concern",
+    "psi_recommendation": "Detailed site assessment and applicable IRC warrant checks; stronger measures only where justified.",
+    "sri_condition": "SRI > 1",
+    "sri_meaning": "Speed in numerator exceeds the applicable limit.",
+    "sri_recommendation": "Investigate speeding, sight distance and suitable speed management; assess traffic calming only if appropriate.",
+    "cri_concern": "High / critical concern",
+    "cri_recommendation": "Prioritise conflict assessment; investigate speed, turning movements and crossing control; major treatments require site review.",
+    "pri_concern": "Lower / moderate concern",
+    "pri_recommendation": "Monitor waiting time, crossing opportunities and pedestrian waiting areas.",
+    "pei_concern": "Lower / moderate concern",
+    "pei_recommendation": "Maintain pedestrian routes; review crossing placement and demand.",
+    "parameters": {
+      "spd_avg": 43.9,
+      "spd_max": 70.2,
+      "tv_avg": 1200,
+      "pv_avg": 30,
+      "ttc": 0.56,
+      "wt_ped": 18.4,
+      "speed_limit": 30.0
+    }
+  },
+  "annotated_video_url": "/api/jobs/test_local4/video",
+  "processing_time_sec": 9.05
+}
