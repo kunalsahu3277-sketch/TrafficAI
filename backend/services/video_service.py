@@ -135,8 +135,8 @@ class VideoService:
 
         for det in detections:
             x1, y1, x2, y2 = det["bbox"]
-            tid = det["track_id"]
-            cname = det["class_name"]
+            tid = det.get("track_id", 0)
+            cname = det.get("class_name") or det.get("class", "Object")
             speed = det.get("speed_kmh", 0.0)
             color = palette.get(cname.lower(), (200, 200, 200))
 
@@ -193,7 +193,7 @@ class VideoService:
                 "-crf", "23",
                 str(temp_path)
             ]
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
             if res.returncode == 0 and temp_path.exists() and temp_path.stat().st_size > 0:
                 temp_path.replace(video_path)
                 logger.info(f"Successfully converted {video_path.name} to H.264 MP4")
