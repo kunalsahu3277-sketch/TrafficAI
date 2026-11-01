@@ -1,10 +1,39 @@
 import os
 import io
+import sys
 import time
+import types
 from datetime import datetime
 from pathlib import Path
 from PIL import Image
 from typing import Optional, List, Dict, Any
+
+# Ensure lap is always available without triggering runtime pip install or C++ compilation
+try:
+    import lap
+    assert hasattr(lap, "lapjv")
+except Exception:
+    try:
+        import numpy as np
+        from scipy.optimize import linear_sum_assignment
+
+        mock_lap = types.ModuleType("lap")
+        mock_lap.__version__ = "0.5.12"
+
+        def _lapjv(cost_matrix, extend_cost=True, cost_limit=1e6):
+            r, c = linear_sum_assignment(cost_matrix)
+            x = np.full(cost_matrix.shape[0], -1, dtype=int)
+            y = np.full(cost_matrix.shape[1], -1, dtype=int)
+            for i, j in zip(r, c):
+                if cost_matrix[i, j] <= cost_limit:
+                    x[i] = j
+                    y[j] = i
+            return 0.0, x, y
+
+        mock_lap.lapjv = _lapjv
+        sys.modules["lap"] = mock_lap
+    except Exception as e:
+        pass
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware

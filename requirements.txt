@@ -13,3 +13,5 @@ python-multipart>=0.0.6
 requests>=2.31.0
 aiofiles>=23.1.0
 imageio-ffmpeg>=0.4.9
+scipy>=1.10.0
+lapx>=0.5.5
